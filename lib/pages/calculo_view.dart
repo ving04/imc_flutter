@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:imc_flutter/Repository/ImcRepository.dart';
+import 'package:hive/hive.dart';
 import 'package:imc_flutter/model/mask_altura.dart';
 
 class DadosImc extends StatefulWidget {
@@ -12,9 +12,59 @@ class DadosImc extends StatefulWidget {
 }
 
 class _DadosImcState extends State < DadosImc > {
-  var imcRepository = ImcRepository();
   var pesoController = TextEditingController();
   var alturaController = TextEditingController();
+
+  List<Map<dynamic, dynamic>> _items = [];
+
+  final _imcBox = Hive.box('imc_box');
+  
+  @override
+  void initState() {
+    super.initState();
+    _refreshItems();
+  }
+
+  calculaImc(double peso, double altura) {
+    return (peso / (altura * altura));
+  }
+
+  String imcGrau(double imc) {
+    if (imc < 16) {
+      return "Magreza grave";
+    } else if (imc >= 16 && imc < 17) {
+      return "Magreza moderada";
+    } else if (imc >= 17 && imc < 18.5) {
+      return "Magreza leve";
+    } else if (imc >= 18.5 && imc < 25) {
+      return "Saudavel";
+    } else if (imc >= 25 && imc < 30) {
+      return "Sobrepeso";
+    } else if (imc >= 30 && imc < 35) {
+      return "Obesidade Grau I";
+    } else if (imc >= 35 && imc < 40) {
+      return "Obesidade Grau II (severa)";
+    } else if (imc >= 40) {
+      return "Obesidade Grau III (mórbida)";
+    }
+    return "";
+  }
+
+  void _refreshItems(){
+    final data = _imcBox.keys.map((key){
+      final item = _imcBox.get(key);
+      return {key: key, "altura": item["altura"], "peso": item["peso"], "imc": item["imc"], "imc_grau": item["imc_grau"],};
+    }).toList();
+
+    setState((){
+      _items = data.reversed.toList();
+    });
+  }
+
+  Future<void> _createItem(Map<dynamic, dynamic> newItem) async {
+    await _imcBox.add(newItem);
+    _refreshItems();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,8 +210,16 @@ class _DadosImcState extends State < DadosImc > {
                                                                 ),
                                                               );
                                                             } else {
-                                                              var imc = imcRepository.calculaImc(peso, altura);
-                                                              imcRepository.add(peso, altura, imc);
+                                                              var imc = calculaImc(peso, altura);
+                                                              var imc_grau = imcGrau(imc);
+
+                                                              _createItem({
+                                                                "peso": pesoController.text,
+                                                                "altura": alturaController.text,
+                                                                "imc": imc.toStringAsFixed(2),
+                                                                "imc_grau": imc_grau
+                                                              });
+
                                                               Navigator.pop(context);
                                                               setState(() {});
                                                               pesoController.text = "";
@@ -197,8 +255,10 @@ class _DadosImcState extends State < DadosImc > {
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 80),
                 child: ListView.builder(
-                  itemCount: imcRepository.imcResults.length,
+                  // itemCount: imcRepository.imcResults.length,
+                  itemCount: _items.length,
                   itemBuilder: (context, index) {
+                    final currentItem = _items[index];
                     return InkWell(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
@@ -216,183 +276,21 @@ class _DadosImcState extends State < DadosImc > {
                                       MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          "Peso: ${imcRepository.imcResults[index].peso?.toStringAsFixed(1)} Kg",
+                                          // "Peso: ${imcRepository.imcResults[index].peso?.toStringAsFixed(1)} Kg",
+                                          "Peso: ${(currentItem['peso'])} Kg",
                                           style: const TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.w500,
                                             color: Colors.white
                                           ),
                                         ),
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              padding: EdgeInsets.zero,
-                                              constraints: BoxConstraints(),
-                                              icon: Icon(Icons.edit_note_outlined),
-                                              color:Color.fromARGB(255, 19, 226, 29),
-                                              onPressed: () {
-                                                pesoController.text = imcRepository.imcResults[index].peso.toString();
-                                                alturaController.text = imcRepository.imcResults[index].altura.toString();
-                                                showModalBottomSheet(
-                                                  context: context,
-                                                  isScrollControlled: true,
-                                                  shape: const RoundedRectangleBorder(
-                                                      borderRadius:
-                                                      BorderRadius.vertical(
-                                                        top: Radius.circular(26)
-                                                      ),
-                                                    ),
-                                                    builder: (context) => SizedBox(
-                                                      child: Padding(
-                                                        padding: EdgeInsets.only(
-                                                          bottom: MediaQuery.of(context).viewInsets.bottom),
-                                                        child: Padding(
-                                                          padding: const EdgeInsets.all(25),
-                                                            child: Column(
-                                                              mainAxisSize: MainAxisSize.min,
-                                                              children: [
-                                                                TextField(
-                                                                  controller: pesoController,
-                                                                  keyboardType: TextInputType.number,
-                                                                  decoration:
-                                                                  const InputDecoration(
-                                                                    hintText: "Peso em Quilos (Ex.: 70)",
-                                                                    labelText: "Peso",
-                                                                    border: OutlineInputBorder(
-                                                                      borderRadius: BorderRadius.all(
-                                                                        Radius.circular(12.0)
-                                                                      )
-                                                                    )
-                                                                  ),
-                                                                ),
-                                                                const SizedBox(
-                                                                    height: 16,
-                                                                  ),
-                                                                  TextField(
-                                                                    controller: alturaController,
-                                                                    inputFormatters: [maskFormatter],
-                                                                    keyboardType: TextInputType.number,
-                                                                    decoration:
-                                                                    const InputDecoration(
-                                                                      hintText: "Altura em metros (Ex.: 1.80)",
-                                                                      labelText: "Altura",
-                                                                      border: OutlineInputBorder(
-                                                                        borderRadius: BorderRadius.all(
-                                                                          Radius.circular(12.0)
-                                                                        )
-                                                                      )
-                                                                    ),
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    height: 16,
-                                                                  ),
-                                                                  Row(
-                                                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                                                    children: [
-                                                                      SizedBox(
-                                                                        width: 140,
-                                                                        height: 45,
-                                                                        child: ElevatedButton(
-                                                                          style: ElevatedButton.styleFrom(
-                                                                            backgroundColor:
-                                                                            Colors.redAccent,
-                                                                            shape: RoundedRectangleBorder(
-                                                                              borderRadius:
-                                                                              BorderRadius.circular(8),
-                                                                            ),
-                                                                          ),
-                                                                          onPressed: () {
-                                                                            Navigator.pop(context);
-                                                                          },
-                                                                          child: const Text("Cancelar")),
-                                                                      ),
-                                                                      SizedBox(
-                                                                        width: 140,
-                                                                        height: 45,
-                                                                        child: ElevatedButton(
-                                                                          style: ElevatedButton.styleFrom(
-                                                                            shape: RoundedRectangleBorder(
-                                                                              borderRadius:
-                                                                              BorderRadius.circular(8),
-                                                                            ),
-                                                                          ),
-                                                                          onPressed: () {
-                                                                            double peso = pesoController.text.toString() == "" ? 0.0 : double.parse(pesoController.text);
-                                                                            double altura = alturaController.text.toString() == "" ? 0.0 : double.parse(alturaController.text);
-                                                                            if (altura == 0.0) {
-                                                                              showDialog(
-                                                                                context: context,
-                                                                                builder: (context) =>
-                                                                                const AlertDialog(
-                                                                                  title: Text("Altura inválida"),
-                                                                                  content: Text("Por favor insira uma altura valida."),
-                                                                                ),
-                                                                              );
-                                                                            } else if (peso == 0.0) {
-                                                                              showDialog(
-                                                                                context: context,
-                                                                                builder: (context) => const AlertDialog(
-                                                                                  title: Text(
-                                                                                    "Peso inválido"),
-                                                                                  backgroundColor:Colors.redAccent,
-                                                                                  content: Text("Por favor insira um peso valido."),
-                                                                                ),
-                                                                              );
-                                                                            } else {
-                                                                              imcRepository.edit(imcRepository.imcResults[index].id.toString(), peso, altura);
-                                                                              pesoController.text = "";
-                                                                              alturaController.text = "";
-                                                                              Navigator.pop(context);
-                                                                              setState(() {});
-                                                                            }
-                                                                          },
-                                                                          child: const Text("Editar"),
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  )
-                                                              ],
-                                                            ),
-                                                        ),
-                                                      )));
-                                              },
-                                            ),
-                                            IconButton(
-                                              padding: EdgeInsets.zero,
-                                              constraints: BoxConstraints(),
-                                              icon: Icon(Icons.delete_forever_outlined),
-                                              color:Color.fromARGB(255, 255, 17, 0),
-                                              onPressed: () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (context) => AlertDialog(
-                                                    title: const Text("Deletar IMC"),
-                                                      content: const Text(
-                                                          "Você tem certeza que deseja deletar esse resultado?"),
-                                                        actions: [
-                                                          TextButton(
-                                                            onPressed: () => Navigator.pop(context),
-                                                            child: const Text("Não")),
-                                                          TextButton(
-                                                            onPressed: () {
-                                                              imcRepository.remove(imcRepository.imcResults[index].id.toString());
-                                                              Navigator.pop(context);
-                                                              setState(() {});
-                                                            },
-                                                            child: const Text("Sim")
-                                                          )
-                                                        ],
-                                                  ));
-                                              },
-                                            ),
-                                          ],
-                                        )
                                       ],
                                     ),
                                     Row(
                                       children: [
                                         Text(
-                                          "Altura: ${imcRepository.imcResults[index].altura.toString()} m",
+                                          // "Altura: ${imcRepository.imcResults[index].altura.toString()} m",
+                                          "Altura: ${(currentItem['altura'])} m",
                                           style: const TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.w500,
@@ -405,7 +303,8 @@ class _DadosImcState extends State < DadosImc > {
                                       MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          "IMC: ${imcRepository.imcResults[index].imc!.toStringAsFixed(1)}",
+                                          // "IMC: ${imcRepository.imcResults[index].imc!.toStringAsFixed(1)}",
+                                          "IMC: ${(currentItem['imc'])}",
                                           style: const TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.w500,
@@ -413,7 +312,8 @@ class _DadosImcState extends State < DadosImc > {
                                           ),
                                         ),
                                         Text(
-                                          imcRepository.imcGrau(imcRepository.imcResults[index].imc!),
+                                          // imcRepository.imcGrau(imcRepository.imcResults[index].imc!),
+                                          "${(currentItem['imc_grau'])}",
                                           style: const TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w500,
@@ -423,7 +323,9 @@ class _DadosImcState extends State < DadosImc > {
                                       ],
                                     ),
                                   ]),
-                              ))),
+                            )
+                          )
+                        ),
                     );
                   }),
               ),

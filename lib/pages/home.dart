@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:imc_flutter/pages/calculo_view.dart';
-import 'package:imc_flutter/Repository/ImcRepository.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -10,7 +9,6 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  var imcRepository = ImcRepository();
 
   @override
   Widget build(BuildContext context) {
